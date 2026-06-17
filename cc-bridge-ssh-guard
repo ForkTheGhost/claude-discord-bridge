@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# cc-bridge-ssh-guard — whitelist the exact SSH commands the bridge uses.
+#
+# Deploy: set as forced-command in authorized_keys on the tmux host for the
+# dedicated bridge SSH key. This ensures the relay host can ONLY run specific
+# tmux commands via SSH — not arbitrary shell commands.
+#
+# authorized_keys entry format:
+#   command="/path/to/cc-bridge-ssh-guard",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA...
+#
+# CUSTOMIZE: Edit the window names (CCode, CC-Infra, etc.) and session name
+# (cc-main) to match your CHANNELS config before deploying.
+#
+# SECURITY: reject anything not in the allowed list.
+set -euo pipefail
+
+CMD="${SSH_ORIGINAL_COMMAND:-}"
+SESSION="cc-main"
+
+case "$CMD" in
+    # ----------------------------------------------------------------
+    # Session / connectivity checks
+    # ----------------------------------------------------------------
+    "true")
+        exec true
+        ;;
+    "tmux has-session -t ${SESSION}")
+        exec tmux has-session -t "${SESSION}"
+        ;;
+
+    # ----------------------------------------------------------------
+    # Per-window: pane command check (claude safety guard)
+    # Add/remove entries to match your CHANNELS config.
+    # ----------------------------------------------------------------
+    "tmux list-panes -t ${SESSION}:CCode -F #{pane_current_command}")
+        exec tmux list-panes -t "${SESSION}:CCode" -F '#{pane_current_command}'
+        ;;
+    "tmux list-panes -t ${SESSION}:CC-Infra -F #{pane_current_command}")
+        exec tmux list-panes -t "${SESSION}:CC-Infra" -F '#{pane_current_command}'
+        ;;
+    "tmux list-panes -t ${SESSION}:CC-ArdI -F #{pane_current_command}")
+        exec tmux list-panes -t "${SESSION}:CC-ArdI" -F '#{pane_current_command}'
+        ;;
+    "tmux list-panes -t ${SESSION}:CC-Palo -F #{pane_current_command}")
+        exec tmux list-panes -t "${SESSION}:CC-Palo" -F '#{pane_current_command}'
+        ;;
+
+    # ----------------------------------------------------------------
+    # Message forwarding: load-buffer (shared), paste-buffer + send Enter
+    # ----------------------------------------------------------------
+    "tmux load-buffer -")
+        exec tmux load-buffer -
+        ;;
+    "tmux paste-buffer -t ${SESSION}:CCode")
+        exec tmux paste-buffer -t "${SESSION}:CCode"
+        ;;
+    "tmux paste-buffer -t ${SESSION}:CC-Infra")
+        exec tmux paste-buffer -t "${SESSION}:CC-Infra"
+        ;;
+    "tmux paste-buffer -t ${SESSION}:CC-ArdI")
+        exec tmux paste-buffer -t "${SESSION}:CC-ArdI"
+        ;;
+    "tmux paste-buffer -t ${SESSION}:CC-Palo")
+        exec tmux paste-buffer -t "${SESSION}:CC-Palo"
+        ;;
+    "tmux send-keys -t ${SESSION}:CCode Enter")
+        exec tmux send-keys -t "${SESSION}:CCode" Enter
+        ;;
+    "tmux send-keys -t ${SESSION}:CC-Infra Enter")
+        exec tmux send-keys -t "${SESSION}:CC-Infra" Enter
+        ;;
+    "tmux send-keys -t ${SESSION}:CC-ArdI Enter")
+        exec tmux send-keys -t "${SESSION}:CC-ArdI" Enter
+        ;;
+    "tmux send-keys -t ${SESSION}:CC-Palo Enter")
+        exec tmux send-keys -t "${SESSION}:CC-Palo" Enter
+        ;;
+
+    # ----------------------------------------------------------------
+    # !screen: capture pane content per window
+    # ----------------------------------------------------------------
+    "tmux capture-pane -p -t ${SESSION}:CCode")
+        exec tmux capture-pane -p -t "${SESSION}:CCode"
+        ;;
+    "tmux capture-pane -p -t ${SESSION}:CC-Infra")
+        exec tmux capture-pane -p -t "${SESSION}:CC-Infra"
+        ;;
+    "tmux capture-pane -p -t ${SESSION}:CC-ArdI")
+        exec tmux capture-pane -p -t "${SESSION}:CC-ArdI"
+        ;;
+    "tmux capture-pane -p -t ${SESSION}:CC-Palo")
+        exec tmux capture-pane -p -t "${SESSION}:CC-Palo"
+        ;;
+
+    # ----------------------------------------------------------------
+    # !sessions: list all windows
+    # ----------------------------------------------------------------
+    "tmux list-windows -t ${SESSION} -F #{window_index} #{window_name}")
+        exec tmux list-windows -t "${SESSION}" -F '#{window_index} #{window_name}'
+        ;;
+
+    # ----------------------------------------------------------------
+    # !revive: recreate session / restart claude per window
+    # ----------------------------------------------------------------
+    "tmux new-session -d -s ${SESSION} -n CCode")
+        exec tmux new-session -d -s "${SESSION}" -n CCode
+        ;;
+    "tmux send-keys -t ${SESSION}:CCode claude Enter")
+        exec tmux send-keys -t "${SESSION}:CCode" claude Enter
+        ;;
+    "tmux send-keys -t ${SESSION}:CC-Infra claude Enter")
+        exec tmux send-keys -t "${SESSION}:CC-Infra" claude Enter
+        ;;
+    "tmux send-keys -t ${SESSION}:CC-ArdI claude Enter")
+        exec tmux send-keys -t "${SESSION}:CC-ArdI" claude Enter
+        ;;
+    "tmux send-keys -t ${SESSION}:CC-Palo claude Enter")
+        exec tmux send-keys -t "${SESSION}:CC-Palo" claude Enter
+        ;;
+
+    *)
+        echo "cc-bridge-ssh-guard: rejected command: $CMD" >&2
+        exit 1
+        ;;
+esac

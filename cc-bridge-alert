@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Post an alert to the primary Discord thread. Usage: cc-bridge-alert 'message text'
+
+The target thread is read from the first entry in ~/.config/cc-bridge-threads/
+matching the primary channel name, or from CC_BRIDGE_THREAD env var.
+"""
+import sys, re, os, json, urllib.request
+
+if len(sys.argv) < 2 or not sys.argv[1].strip():
+    sys.exit(0)
+
+# Resolve thread ID: env var → first thread file → exit
+thread = os.environ.get("CC_BRIDGE_THREAD", "").strip()
+if not thread:
+    # Try to find a thread file for a default window
+    threads_dir = os.path.expanduser("~/.config/cc-bridge-threads")
+    if os.path.isdir(threads_dir):
+        # Use alphabetically first file as fallback primary
+        try:
+            files = sorted(f for f in os.listdir(threads_dir) if not f.startswith("."))
+            if files:
+                thread = open(os.path.join(threads_dir, files[0])).read().strip()
+        except Exception:
+            pass
+
+if not thread:
+    sys.exit(0)
+
+tok = ''
+try:
+    for line in open(os.path.expanduser('~/.config/cc-bridge-token')):
+        m = re.match(r"\s*(?:export\s+)?DISCORD_BOT_TOKEN_CCODE\s*=\s*['\"]?([^\s'\"]+)", line)
+        if m:
+            tok = m.group(1)
+            break
+except Exception:
+    pass
+
+if not tok:
+    sys.exit(0)
+
+req = urllib.request.Request(
+    f'https://discord.com/api/v10/channels/{thread}/messages',
+    data=json.dumps({'content': sys.argv[1],
+                     'allowed_mentions': {'parse': []}}).encode(),
+    method='POST',
+    headers={'Authorization': f'Bot {tok}',
+             'Content-Type': 'application/json',
+             'User-Agent': 'cc-bridge-alert'},
+)
+try:
+    urllib.request.urlopen(req, timeout=10)
+except Exception:
+    pass

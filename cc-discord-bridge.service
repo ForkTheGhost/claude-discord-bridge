@@ -1,0 +1,38 @@
+[Unit]
+Description=cc-discord-bridge — Discord thread ↔ tmux relay
+Documentation=https://github.com/pillers/claude-discord-bridge
+After=network-online.target
+Wants=network-online.target
+# Unattended 7-day operation: never let systemd stop retrying after fast crashes.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Change User/Group to the account that will run the bridge on your relay host
+User=youruser
+Group=youruser
+# Change WorkingDirectory to where you cloned this repo on the relay host
+WorkingDirectory=/home/youruser/cc-discord-bridge
+
+ExecStart=/usr/bin/python3 /home/youruser/cc-discord-bridge/bridge.py
+
+Restart=always
+RestartSec=3
+
+# Never pass secrets via argv or env — bridge reads TOKEN_ENV_FILE from config.py
+# Do NOT set DISCORD_BOT_TOKEN_CC here.
+# If you need to pass CC_BRIDGE_OWNER_ID for the hook scripts, set it here:
+# Environment=CC_BRIDGE_OWNER_ID=your_discord_user_id
+
+# Journald logging (no separate log file needed)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cc-discord-bridge
+
+# Harden the process
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target
