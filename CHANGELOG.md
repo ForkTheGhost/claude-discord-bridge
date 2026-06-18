@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.1] — 2026-06-18
+
+### Fixed
+- **🔕 reaction noise**: `mention_only` channels were reacting with 🔕 to *every* non-mentioning message (other users, bots, random traffic). Now only messages from a `forward_bots` member that failed the @mention check receive the 🔕 reaction — the intended signal that a trusted bot tried to reach CC but didn't include the mention.
+
 ## [1.1.0] — 2026-06-18
 
 ### Added

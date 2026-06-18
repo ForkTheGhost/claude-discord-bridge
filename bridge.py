@@ -8,7 +8,7 @@ Secrets never appear in argv, logs, or Discord output.
 Configuration: copy config.example.py to config.py and fill in your values.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 from __future__ import annotations
 
@@ -723,7 +723,7 @@ def main() -> None:
                             if (f"<@{BRIDGE_BOT_ID}>" not in content
                                     and f"<@!{BRIDGE_BOT_ID}>" not in content):
                                 log.debug("SKIP msg=%s ch=%s reason=no_mention", msg_id, ch.name)
-                                if msg_id:
+                                if msg_id and author_id in ch.forward_bots:
                                     discord.add_reaction(ch.thread_id, msg_id, "🔕")
                                 continue
 
