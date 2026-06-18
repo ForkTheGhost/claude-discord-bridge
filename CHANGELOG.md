@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3] — 2026-06-06
+
+### Added
+- **`_voice_worker.py` — TTS voice routing per window**: `_resolve_voice()` scans `~/.config/cc-bridge-threads/` to find the window owning a thread ID, then reads `~/.config/cc-bridge-voices/<window>` for the voice key. Falls back to `TTS_VOICE_DEFAULT` (`"echo"`) if unconfigured.
+- **`_resample_44k()`**: Converts Kokoro's 24 kHz MPEG-2 MP3 output to 44.1 kHz MPEG-1 via ffmpeg for iOS/Safari playback compatibility. Fail-open — returns original audio if ffmpeg is absent or conversion fails.
+- **F5-TTS voice support**: `_tts()` passes the voice key directly to the TTS server, enabling custom voice clones (`"ardi"`, `"palo"`) alongside Kokoro voices (`"echo"`, `"onyx"`, etc.).
+- **LLM config via `config.py` or env vars**: `LLM_URL` and `LLM_MODEL` can be set in `config.py` or via `CC_BRIDGE_LLM_URL` / `CC_BRIDGE_LLM_MODEL` environment variables. Defaults to `http://127.0.0.1:8080/v1/chat/completions`.
+
 ## [1.1.2] — 2026-06-18
 
 ### Fixed

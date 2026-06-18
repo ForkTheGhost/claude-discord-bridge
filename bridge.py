@@ -8,7 +8,7 @@ Secrets never appear in argv, logs, or Discord output.
 Configuration: copy config.example.py to config.py and fill in your values.
 """
 
-__version__ = "1.1.2"
+__version__ = "1.1.3"
 
 from __future__ import annotations
 
