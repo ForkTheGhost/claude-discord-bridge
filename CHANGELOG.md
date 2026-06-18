@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4] — 2026-06-18
+
+### Added
+- **`forward_voice` channel config field**: Source channels (e.g. `ArdI-src`, `Palo-src`) can now specify a TTS voice key via `"forward_voice": "ardi"` in config. When a `forward_bots` message is mirrored to another channel, the bridge spawns `_voice_worker.py` with that voice, so ArdI and Palo can speak in their own distinct voices (F5 clones) rather than Claudius's default.
+- **`_spawn_voice()` helper in `bridge.py`**: Fire-and-forget subprocess that passes optional voice override to the voice worker.
+- **`_voice_worker.py` voice override arg**: Accepts optional `argv[2]` voice key; if provided, skips `_resolve_voice()` config lookup. This lets the bridge caller dictate the voice without needing per-thread config files.
+
 ## [1.1.3] — 2026-06-06
 
 ### Added

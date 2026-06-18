@@ -8,7 +8,7 @@ Secrets never appear in argv, logs, or Discord output.
 Configuration: copy config.example.py to config.py and fill in your values.
 """
 
-__version__ = "1.1.3"
+__version__ = "1.1.4"
 
 from __future__ import annotations
 
@@ -136,6 +136,7 @@ class Channel:
     forward_bots: frozenset = field(default_factory=frozenset)  # bot IDs allowed past OWNER_ID filter
     source_prefix: str = ""    # prepended to messages from forward_bots
     mirror_channel: str = ""   # if set, echo forwarded bot messages to this Discord channel ID
+    forward_voice: str = ""    # TTS voice key to use when speaking mirrored forward_bots messages
     bucket: TokenBucket = field(default_factory=lambda: TokenBucket(BUCKET_CAPACITY, BUCKET_RATE))
 
 
@@ -146,6 +147,7 @@ CHANNELS = [
         forward_bots=frozenset(c.get("forward_bots", ())),
         source_prefix=c.get("source_prefix", ""),
         mirror_channel=c.get("mirror_channel", ""),
+        forward_voice=c.get("forward_voice", ""),
     )
     for c in CHANNELS_CFG
 ]
@@ -470,6 +472,25 @@ def _chunk_text(text: str, max_len: int = 1900) -> list[str]:
     return chunks
 
 
+_VOICE_WORKER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_voice_worker.py")
+
+
+def _spawn_voice(thread_id: str, text: str, voice: str) -> None:
+    """Fire-and-forget: speak `text` in `voice` and post audio to `thread_id`."""
+    if not os.path.exists(_VOICE_WORKER):
+        return
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, _VOICE_WORKER, thread_id, voice],
+            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        proc.stdin.write(text.encode("utf-8", errors="replace"))
+        proc.stdin.close()
+    except Exception:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Control command handler (channel-aware)
 # ---------------------------------------------------------------------------
@@ -769,6 +790,8 @@ def main() -> None:
                                     discord.post_message(ch.mirror_channel, chunk)
                             except Exception as exc:
                                 log.warning("mirror post failed ch=%s: %s", ch.name, exc)
+                            if ch.forward_voice and os.path.exists(os.path.expanduser("~/.config/cc-bridge-voice")):
+                                _spawn_voice(ch.mirror_channel, redact(content), ch.forward_voice)
                     else:
                         log.error("tmux forward failed msg=%s ch=%s err=%s", msg_id, ch.name, err)
                         discord.add_reaction(ch.thread_id, msg_id, "❌")

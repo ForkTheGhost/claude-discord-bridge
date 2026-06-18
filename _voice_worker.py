@@ -231,7 +231,8 @@ def main() -> None:
     if not tok:
         return
 
-    voice = _resolve_voice(thread_id)
+    # argv[2] allows caller (bridge.py) to override voice without config lookup
+    voice = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else _resolve_voice(thread_id)
     summary = _summarize(body)
     audio = _tts(summary, voice)
     if not audio:
