@@ -8,6 +8,8 @@ Secrets never appear in argv, logs, or Discord output.
 Configuration: copy config.example.py to config.py and fill in your values.
 """
 
+__version__ = "1.1.0"
+
 from __future__ import annotations
 
 import json
@@ -131,11 +133,20 @@ class Channel:
     last_seen: str = "0"
     locked: bool = False
     mention_only: bool = False
+    forward_bots: frozenset = field(default_factory=frozenset)  # bot IDs allowed past OWNER_ID filter
+    source_prefix: str = ""    # prepended to messages from forward_bots
+    mirror_channel: str = ""   # if set, echo forwarded bot messages to this Discord channel ID
     bucket: TokenBucket = field(default_factory=lambda: TokenBucket(BUCKET_CAPACITY, BUCKET_RATE))
 
 
 CHANNELS = [
-    Channel(c["name"], c["thread_id"], c["tmux_target"])
+    Channel(
+        c["name"], c["thread_id"], c["tmux_target"],
+        mention_only=bool(c.get("mention_only", False)),
+        forward_bots=frozenset(c.get("forward_bots", ())),
+        source_prefix=c.get("source_prefix", ""),
+        mirror_channel=c.get("mirror_channel", ""),
+    )
     for c in CHANNELS_CFG
 ]
 
@@ -164,7 +175,10 @@ def _load_state() -> None:
             if ch.name in ch_data:
                 ch.last_seen     = str(ch_data[ch.name].get("last_seen", "0"))
                 ch.locked        = bool(ch_data[ch.name].get("locked", False))
-                ch.mention_only  = bool(ch_data[ch.name].get("mention_only", False))
+                # Don't restore mention_only for source channels (forward_bots set) —
+                # their mention gate is config, not runtime state.
+                if not ch.forward_bots:
+                    ch.mention_only  = bool(ch_data[ch.name].get("mention_only", False))
     # Legacy single-channel format: {"last_seen": "...", "locked": bool}
     elif "last_seen" in data:
         CCODE_CHANNEL.last_seen = str(data.get("last_seen", "0"))
@@ -679,10 +693,10 @@ def main() -> None:
                             continue
 
                     # Drop filters — log reason, NEVER log content
-                    if author_id != OWNER_ID:
+                    if author_id != OWNER_ID and author_id not in ch.forward_bots:
                         log.debug("DROP msg=%s ch=%s reason=wrong_author", msg_id, ch.name)
                         continue
-                    if is_bot:
+                    if is_bot and author_id not in ch.forward_bots:
                         log.debug("DROP msg=%s ch=%s reason=bot_author", msg_id, ch.name)
                         continue
                     if webhook_id:
@@ -692,7 +706,7 @@ def main() -> None:
                     stripped   = content.strip()
                     is_literal = stripped.startswith("!!")
 
-                    if stripped.startswith("!") and not is_literal:
+                    if stripped.startswith("!") and not is_literal and author_id not in ch.forward_bots:
                         word = stripped.split()[0]
                         log.info("Control command msg=%s ch=%s word=%s", msg_id, ch.name, word)
                         try:
@@ -741,10 +755,22 @@ def main() -> None:
                     last_input_ts = time.monotonic()
                     log.info("Forwarding msg=%s to %s", msg_id, ch.tmux_target)
                     fwd = content.replace("!", "", 1) if is_literal else content
+                    if ch.source_prefix and author_id in ch.forward_bots:
+                        if not fwd.strip():
+                            log.debug("DROP msg=%s ch=%s reason=empty_bot_content", msg_id, ch.name)
+                            continue
+                        fwd = ch.source_prefix + ":\n" + fwd
                     raw_bytes = sanitize_input(fwd).encode("utf-8")
                     ok, err = tmux_forward(raw_bytes, ch.tmux_target)
                     if ok:
                         discord.add_reaction(ch.thread_id, msg_id, "👀")
+                        if ch.mirror_channel and author_id in ch.forward_bots:
+                            mirror_text = redact(fwd)
+                            try:
+                                for chunk in _chunk_text(mirror_text, 1900):
+                                    discord.post_message(ch.mirror_channel, chunk)
+                            except Exception as exc:
+                                log.warning("mirror post failed ch=%s: %s", ch.name, exc)
                     else:
                         log.error("tmux forward failed msg=%s ch=%s err=%s", msg_id, ch.name, err)
                         discord.add_reaction(ch.thread_id, msg_id, "❌")

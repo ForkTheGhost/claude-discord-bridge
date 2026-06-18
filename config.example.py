@@ -31,6 +31,21 @@ CHANNELS = [
     {"name": "CC-Infra", "thread_id": "YOUR_INFRA_THREAD_ID",    "tmux_target": "cc-main:CC-Infra"},
     {"name": "CC-ArdI",  "thread_id": "YOUR_ARDI_THREAD_ID",     "tmux_target": "cc-main:CC-ArdI"},
     {"name": "CC-Palo",  "thread_id": "YOUR_PALO_THREAD_ID",     "tmux_target": "cc-main:CC-Palo"},
+
+    # Optional: source channel — route messages from a bot's own channel to a CC tmux window.
+    # forward_bots: list of Discord bot user IDs allowed to bypass the OWNER_ID filter.
+    # source_prefix: text prepended to forwarded messages so tmux knows the origin.
+    # mirror_channel: if set, echo each forwarded bot message to this Discord channel ID.
+    # mention_only: when True, the bot must @mention your bridge bot to trigger forwarding.
+    # {
+    #     "name": "Bot-src",
+    #     "thread_id": "YOUR_BOT_CHANNEL_ID",
+    #     "tmux_target": "cc-main:CC-ArdI",
+    #     "mention_only": True,
+    #     "forward_bots": ["YOUR_BOT_USER_ID"],
+    #     "source_prefix": "From Bot on Discord #bot-channel",
+    #     "mirror_channel": "YOUR_CC_CHANNEL_ID",
+    # },
 ]
 
 # The first channel's thread_id — used for heartbeat and startup announcements.
