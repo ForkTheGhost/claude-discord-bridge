@@ -114,8 +114,6 @@ def main() -> None:
         pass
 
     if not tpath or not os.path.exists(tpath):
-        if _should_fallback_ping(thread):
-            _spawn_fallback_ping(thread)
         return
 
     # Brief stability wait — transcript may still be mid-write
@@ -135,8 +133,7 @@ def main() -> None:
         except Exception:
             pass
     else:
-        if _should_fallback_ping(thread):
-            _spawn_fallback_ping(thread)
+        pass
 
 
 if __name__ == "__main__":

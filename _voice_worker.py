@@ -3,11 +3,17 @@
 
 Called by cc-stophook-post.py as a fire-and-forget subprocess.
 Args: <thread_id>
-Reads body text from stdin. Always exits 0 (fail-open).
+Stdin: full response body text (piped by caller).
+Always exits 0 (fail-open).
 
 Requires a running local LLM server (llama.cpp or MLX compatible with OpenAI
 chat completions API) and a TTS server (Kokoro or similar).
 Configure LLM_URL and LLM_MODEL in config.py (or via environment variables).
+
+Voice is resolved per-window:
+  ~/.config/cc-bridge-threads/<window_name>  — contains the Discord channel/thread ID
+  ~/.config/cc-bridge-voices/<window_name>   — contains the TTS voice key
+Falls back to TTS_VOICE_DEFAULT if no per-window config is found.
 """
 from __future__ import annotations
 
@@ -18,10 +24,11 @@ import sys
 import urllib.error
 import urllib.request
 
-TTS_URL   = "http://127.0.0.1:8085/v1/audio/speech"
-TTS_VOICE = "echo"   # maps to Kokoro bm_daniel (British male) in tts-server.py KOKORO_VOICE_MAP
-API       = "https://discord.com/api/v10"
-TOKEN_FILE = os.path.expanduser("~/.config/cc-bridge-token")
+TTS_URL           = "http://127.0.0.1:8085/v1/audio/speech"
+TTS_VOICE_DEFAULT = "echo"   # maps to Kokoro bm_daniel (British male) in tts-server.py KOKORO_VOICE_MAP
+VOICES_CONFIG_DIR = os.path.expanduser("~/.config/cc-bridge-voices")
+API               = "https://discord.com/api/v10"
+TOKEN_FILE        = os.path.expanduser("~/.config/cc-bridge-token")
 
 # LLM configuration — loaded from config.py or environment variables
 _LLM_URL   = os.environ.get("CC_BRIDGE_LLM_URL",   "http://127.0.0.1:8080/v1/chat/completions")
@@ -74,6 +81,29 @@ def _read_token() -> str:
     return ""
 
 
+def _resolve_voice(thread_id: str) -> str:
+    """Return TTS voice key for the window that owns thread_id, or default.
+
+    Scans ~/.config/cc-bridge-threads/ for a file whose content matches
+    thread_id, then reads the matching ~/.config/cc-bridge-voices/<window>
+    file for the voice key.
+    """
+    threads_dir = os.path.expanduser("~/.config/cc-bridge-threads")
+    if os.path.isdir(threads_dir):
+        for fname in os.listdir(threads_dir):
+            if "/" in fname or fname.startswith("."):
+                continue
+            fpath = os.path.join(threads_dir, fname)
+            try:
+                if open(fpath).read().strip() == thread_id:
+                    voice_file = os.path.join(VOICES_CONFIG_DIR, fname)
+                    if os.path.isfile(voice_file):
+                        return open(voice_file).read().strip()
+            except Exception:
+                pass
+    return TTS_VOICE_DEFAULT
+
+
 def _summarize(body: str) -> str:
     """Prepare text for TTS: verbatim prose, technical noise replaced with descriptions.
     Returns original excerpt on failure."""
@@ -110,12 +140,12 @@ def _summarize(body: str) -> str:
         return body[:2000]
 
 
-def _tts(text: str) -> bytes | None:
+def _tts(text: str, voice: str = TTS_VOICE_DEFAULT) -> bytes | None:
     """Generate MP3 via TTS server. Returns None on failure."""
     payload = json.dumps({
         "model": "tts-1",
         "input": text[:8000],
-        "voice": TTS_VOICE,
+        "voice": voice,
         "response_format": "mp3",
     }).encode()
     req = urllib.request.Request(
@@ -165,8 +195,9 @@ def main() -> None:
     if not tok:
         return
 
+    voice = _resolve_voice(thread_id)
     summary = _summarize(body)
-    audio = _tts(summary)
+    audio = _tts(summary, voice)
     if not audio:
         return
 
