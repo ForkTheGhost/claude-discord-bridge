@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.3] — 2026-06-18
+
+### Added
+- **Per-agent TTS voice** (`forward_voice` on `Channel`): when a `forward_bots` message is mirrored, the bridge now optionally speaks it aloud using a per-channel voice key (e.g. `"am_adam"` for Claudius, `"ardi"` for ArdI). Requires `~/.config/cc-bridge-voice` sentinel file to be present (opt-in). Spawns `_voice_worker.py` as a fire-and-forget subprocess.
+- **`CC_BRIDGE_TTS_URL` env var** in `_voice_worker.py`: allows pointing the TTS server at a remote host (e.g. `http://192.168.11.13:8085/v1/audio/speech` for ardymus-grid → MBPm5). Falls back to `http://127.0.0.1:8085`.
+
 ## [1.1.2] — 2026-06-18
 
 ### Fixed

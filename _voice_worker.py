@@ -24,7 +24,7 @@ import sys
 import urllib.error
 import urllib.request
 
-TTS_URL           = "http://127.0.0.1:8085/v1/audio/speech"
+TTS_URL           = os.environ.get("CC_BRIDGE_TTS_URL", "http://127.0.0.1:8085/v1/audio/speech")
 TTS_VOICE_DEFAULT = "echo"   # maps to Kokoro bm_daniel (British male) in tts-server.py KOKORO_VOICE_MAP
 VOICES_CONFIG_DIR = os.path.expanduser("~/.config/cc-bridge-voices")
 API               = "https://discord.com/api/v10"
