@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.2] — 2026-06-18
+
+### Fixed
+- **🔕 reaction removed from mention_only path**: Messages that fail the @mention check are now silently dropped with no reaction. The 🔕 was noise — un-mentioned messages from any author (bots, users) are simply ignored. Forward failures still produce ❌.
+
 ## [1.1.1] — 2026-06-18
 
 ### Fixed
