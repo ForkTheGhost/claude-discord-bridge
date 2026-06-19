@@ -132,14 +132,14 @@ def current_turn_assistant_text(transcript_path: str) -> str:
 
 
 def read_bridge_thread() -> str:
-    """Env var first; fall back to TMUX_PANE → window_name → thread file.
+    """Thread file first (dynamically updated); fall back to override file, then env var.
 
-    Thread files live at ~/.config/cc-bridge-threads/<window_name>.
-    Each file contains a single Discord thread/channel snowflake ID.
+    Priority:
+      1. TMUX_PANE → ~/.config/cc-bridge-threads/<window>  (per-window, authoritative)
+      2. ~/.config/cc-bridge-thread (singular override file — updated on channel migration)
+      3. CC_BRIDGE_THREAD env var (last resort; may be stale after channel migration)
+    File sources take precedence so channel migrations take effect without restarting claude.
     """
-    t = os.environ.get("CC_BRIDGE_THREAD", "").strip()
-    if t:
-        return t
     try:
         pane = os.environ.get("TMUX_PANE", "")
         if pane:
@@ -154,18 +154,20 @@ def read_bridge_thread() -> str:
                     return open(thread_file).read().strip()
     except Exception:
         pass
-    return ""
+    # Priority 2: singular override file (survives session restarts and channel migrations)
+    try:
+        override = os.path.expanduser("~/.config/cc-bridge-thread")
+        if os.path.exists(override):
+            val = open(override).read().strip()
+            if val:
+                return val
+    except Exception:
+        pass
+    return os.environ.get("CC_BRIDGE_THREAD", "").strip()
 
 
 def read_token() -> str:
-    """Read CC bot token from ~/.config/cc-bridge-token.
-
-    The file must contain a line in one of these formats:
-        export DISCORD_BOT_TOKEN_CCODE=your_token_here
-        DISCORD_BOT_TOKEN_CCODE=your_token_here
-
-    Falls back to DISCORD_BOT_TOKEN_CC in ~/.zshenv for backward compatibility.
-    """
+    """Read CC bot token from ~/.config/cc-bridge-token or ~/.zshenv fallback."""
     try:
         for line in open(os.path.expanduser("~/.config/cc-bridge-token")):
             m = re.match(r'\s*(?:export\s+)?DISCORD_BOT_TOKEN_CCODE\s*=\s*[\'"]?([^\s\'"]+)', line)

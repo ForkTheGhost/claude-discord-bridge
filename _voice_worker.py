@@ -20,7 +20,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 
@@ -161,6 +163,40 @@ def _tts(text: str, voice: str = TTS_VOICE_DEFAULT) -> bytes | None:
         return None
 
 
+def _resample_44k(audio: bytes, ffmpeg: str = "/opt/homebrew/bin/ffmpeg") -> bytes:
+    """Resample MP3 to MPEG-1 44.1 kHz for iOS/Safari compatibility.
+
+    Kokoro TTS outputs MPEG-2 at 24 kHz which iOS AudioToolbox / Safari may
+    refuse to play inline. ffmpeg converts to standard MPEG-1 44.1 kHz.
+    Fail-open: returns original audio if ffmpeg is absent or conversion fails.
+    """
+    if not os.path.exists(ffmpeg):
+        return audio
+    in_path = out_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as fin:
+            fin.write(audio)
+            in_path = fin.name
+        out_path = in_path + "_44k.mp3"
+        result = subprocess.run(
+            [ffmpeg, "-y", "-i", in_path, "-ar", "44100", "-b:a", "64k", out_path],
+            capture_output=True, timeout=30,
+        )
+        if result.returncode == 0 and os.path.getsize(out_path) > 500:
+            with open(out_path, "rb") as f:
+                return f.read()
+    except Exception:
+        pass
+    finally:
+        for p in (in_path, out_path):
+            if p:
+                try:
+                    os.unlink(p)
+                except Exception:
+                    pass
+    return audio
+
+
 def _post_audio(thread_id: str, audio: bytes, tok: str) -> None:
     boundary = "----ccvoice"
     pj = json.dumps({"allowed_mentions": {"parse": []}}).encode()
@@ -195,11 +231,14 @@ def main() -> None:
     if not tok:
         return
 
-    voice = _resolve_voice(thread_id)
+    # argv[2] allows caller (bridge.py) to override voice without config lookup
+    voice = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else _resolve_voice(thread_id)
     summary = _summarize(body)
     audio = _tts(summary, voice)
     if not audio:
         return
+
+    audio = _resample_44k(audio)
 
     try:
         _post_audio(thread_id, audio, tok)
