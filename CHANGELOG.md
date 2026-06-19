@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.5] — 2026-06-19
+
+### Fixed
+- **`mention_only` bypassed for `forward_bots` authors**: `mention_only=True` on source channels is intended to gate the owner's own messages; trusted bots in `forward_bots` should always be forwarded regardless. Bug: the check ran unconditionally, silently dropping ArdI/Palo messages that did not @mention the bridge bot and preventing voice from being spawned. Fix: `if ch.mention_only and author_id not in ch.forward_bots:`.
+
 ## [1.1.4] — 2026-06-19
 
 ### Added

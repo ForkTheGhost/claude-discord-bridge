@@ -736,7 +736,7 @@ def main() -> None:
                             log.error("Control handler error (msg=%s ch=%s): %s", msg_id, ch.name, exc)
                         continue
 
-                    if ch.mention_only:
+                    if ch.mention_only and author_id not in ch.forward_bots:
                         mentioned_ids = {u.get("id", "") for u in msg.get("mentions", [])}
                         if BRIDGE_BOT_ID not in mentioned_ids:
                             # Fallback: check raw mention syntax in content for reply-pings
