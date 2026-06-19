@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.4] — 2026-06-19
+
+### Added
+- **`_resample_44k()` in `_voice_worker.py`**: Converts Kokoro's 24 kHz MPEG-2 MP3 output to 44.1 kHz MPEG-1 via ffmpeg for iOS/Safari playback compatibility. Fail-open — returns original audio if ffmpeg is absent or conversion fails.
+- **`argv[2]` voice override in `_voice_worker.py`**: Caller (`bridge.py`) can pass a voice key directly as a second argument, bypassing `_resolve_voice()` config lookup.
+
+### Fixed
+- **`read_bridge_thread()` stale env var fallback**: After a Discord channel migration, `CC_BRIDGE_THREAD` env var in long-running sessions could point to old thread IDs. Added `~/.config/cc-bridge-thread` (singular) as priority-2 fallback, read after TMUX_PANE lookup but before the env var. Protects against double-posting when TMUX_PANE lookup occasionally fails. Thread file is updated at migration time; env var is now last resort only.
+
 ## [1.1.3] — 2026-06-18
 
 ### Added
