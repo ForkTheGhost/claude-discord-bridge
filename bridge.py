@@ -8,7 +8,7 @@ Secrets never appear in argv, logs, or Discord output.
 Configuration: copy config.example.py to config.py and fill in your values.
 """
 
-__version__ = "1.1.3"
+__version__ = "1.1.6"
 
 from __future__ import annotations
 
@@ -736,7 +736,13 @@ def main() -> None:
                             log.error("Control handler error (msg=%s ch=%s): %s", msg_id, ch.name, exc)
                         continue
 
-                    if ch.mention_only and author_id not in ch.forward_bots:
+                    # Voice fires for all forward_bots posts regardless of @mention gate
+                    if (author_id in ch.forward_bots and ch.forward_voice and ch.mirror_channel
+                            and content.strip()
+                            and os.path.exists(os.path.expanduser("~/.config/cc-bridge-voice"))):
+                        _spawn_voice(ch.mirror_channel, redact(content), ch.forward_voice)
+
+                    if ch.mention_only:
                         mentioned_ids = {u.get("id", "") for u in msg.get("mentions", [])}
                         if BRIDGE_BOT_ID not in mentioned_ids:
                             # Fallback: check raw mention syntax in content for reply-pings
@@ -790,8 +796,7 @@ def main() -> None:
                                     discord.post_message(ch.mirror_channel, chunk)
                             except Exception as exc:
                                 log.warning("mirror post failed ch=%s: %s", ch.name, exc)
-                            if ch.forward_voice and os.path.exists(os.path.expanduser("~/.config/cc-bridge-voice")):
-                                _spawn_voice(ch.mirror_channel, redact(content), ch.forward_voice)
+                            # voice already spawned before mention_only check
                     else:
                         log.error("tmux forward failed msg=%s ch=%s err=%s", msg_id, ch.name, err)
                         discord.add_reaction(ch.thread_id, msg_id, "❌")

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.6] — 2026-06-19
+
+### Fixed
+- **Voice fires independent of `mention_only` gate**: split voice spawning from the CC/tmux forwarding path. Voice is now triggered for all `forward_bots` posts before the `mention_only` check, so ArdI/Palo audio plays even when the bot did not @mention the bridge. The `mention_only` gate is restored to its original form (gates ALL authors including `forward_bots`) so only @-mentioned messages reach CC.
+
 ## [1.1.5] — 2026-06-19
 
 ### Fixed
